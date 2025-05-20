@@ -1,4 +1,6 @@
 
+using System.Collections;
+using System.Security;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody))]
@@ -14,12 +16,21 @@ public class CharacterController : MonoBehaviour
     public float groundDistance =0.4f;
     public float dashForce = 0.5f;
     public float dashCooldown = 1;
+    [Header("Animations")]
+    public Animator animator;
+    public AttackInfo[] attacks;
 
+    [Header("Attacks")]
+    public float attackCooldown = 2.5f;
+
+
+    private float attackTimer;
     private float dashTimer;
-    private  Rigidbody rb;
+    private bool isGrounded;
+    private Rigidbody rb;
     private Vector3 moveInput;
     private Vector3 moveVelocity;
-    private bool isGrounded;
+    private int attackIndex;
     
     
     void Start()
@@ -42,7 +53,19 @@ public class CharacterController : MonoBehaviour
         if(Input.GetKeyDown(KeyCode.LeftShift)&& dashTimer<=0){
             Dash();
         }
+        
+        if(Input.GetMouseButtonDown(0) && attackTimer<=0){
+            StartCoroutine(Attack());
+        }
+
+        if(moveInput != Vector3.zero){
+            var targetRotation = Quaternion.LookRotation(moveInput);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime*10f);
+        }
         dashTimer-=Time.deltaTime;
+        attackTimer -= Time.deltaTime;
+
+        animator.SetBool("IsMoving", moveInput != Vector3.zero);
     }
     void FixedUpdate()
     {
@@ -54,6 +77,41 @@ public class CharacterController : MonoBehaviour
     }
     void Dash()
     {
-        // var direction = moveInput !=Vector3
+        var direction = moveInput != Vector3.zero ? moveInput : Vector3.forward;
+
+        //condition ? if true : if false 
+        //moveInput != Vector3.zero ? moveInput : Vector3.forward;
+        //if(moveInput != Vector3.zero){
+        //    direction = moveInput;
+        //}
+        //else{
+        //    direction = Vector3.forward;
+        //}
+        
+        rb.AddForce(direction * dashForce, ForceMode.Impulse);
+    }
+
+    IEnumerator Attack()
+    {
+        attackTimer = attackCooldown;
+        animator.Play(attacks[attackIndex].name);
+
+        yield return new WaitForSeconds(attacks[attackIndex].delay);
+
+        if(attacks[attackIndex].vfx!= null)
+        {
+
+            if(attacks[attackIndex].target!=null)
+            {
+                Instantiate(attacks[attackIndex].vfx, attacks[attackIndex].target.transform.position, attacks[attackIndex].target.transform.rotation);
+            }
+            else
+            {
+                Instantiate(attacks[attackIndex].vfx, transform.position, Quaternion.identity);
+            }
+        }
+
+        attackIndex++;
+        attackIndex %= attacks.Length;
     }
 }
